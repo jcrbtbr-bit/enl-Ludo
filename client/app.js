@@ -1,3 +1,4 @@
+
 /**
  * LUDO KING — CLIENT APPLICATION
  * Handles board rendering, socket communication, UI state
@@ -258,6 +259,7 @@ function setupSocketEvents() {
   });
 
   socket.on('player_joined', ({ room }) => {
+
     renderLobby(room);
     showToast(`${room.players[room.players.length - 1].name} joined!`);
   });
@@ -296,7 +298,6 @@ function setupSocketEvents() {
   });
 
   socket.on('token_moved', async ({ color, tokenIndex, oldPosition, newPosition, path, captured, dice }) => {
-    // Animate move through path
     if (path && path.length > 0) {
       await animateJumpPath(color, tokenIndex, path);
     } else {
@@ -434,7 +435,6 @@ function renderLobby(room) {
 function renderGameUI() {
   if (!gameState) return;
 
-  // Player panels
   const panels = document.getElementById('player-panels');
   panels.innerHTML = '';
   gameState.players.forEach(p => {
@@ -456,7 +456,6 @@ function renderGameUI() {
     panels.appendChild(div);
   });
 
-  // Turn banner
   const cp = gameState.players.find(p => p.color === gameState.currentTurn);
   const cpBot = cp && cp.type === 'bot';
   const turnText = cp ? `${cpBot ? '🤖 ' : ''}${cp.name}${cp.color === myColor ? ' (You)' : ''}'s Turn` : '...';
@@ -464,16 +463,13 @@ function renderGameUI() {
   turnEl.textContent = turnText;
   turnEl.style.color = COLOR_LIGHT[gameState.currentTurn] || '#fff';
 
-  // Roll button
   updateRollButton();
 
-  // Game info
   document.getElementById('game-info-content').innerHTML = `
     <div style="margin-bottom:6px">Move #${gameState.moveCount || 0}</div>
     ${gameState.rankings.map(r => `<div style="font-size:11px;color:var(--c-muted)">#${r.rank} ${r.name}</div>`).join('')}
   `;
 
-  // Dice display
   const diceEl = document.getElementById('dice');
   const faces = ['', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
   if (gameState.diceValue) {
@@ -510,7 +506,6 @@ function startTimerBar() {
     bar.style.width = '0%';
   }, 50);
 }
-
 // =====================================================================
 // BOARD CLICK
 // =====================================================================
@@ -524,7 +519,6 @@ function onBoardClick(e) {
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
 
-  // Check if click is near any valid token
   const tokens = gameState.tokens[myColor];
   for (const move of gameState.validMoves) {
     const token = tokens[move.tokenIndex];
@@ -552,40 +546,35 @@ function drawBoard(gs) {
 }
 
 function drawBoardBase() {
-  // Background
   ctx.fillStyle = '#1a1a2e';
   ctx.fillRect(0, 0, BOARD_SIZE, BOARD_SIZE);
 
-  // Draw the 4 colored quadrants (base areas)
   const bases = [
-    { color: '#e83b3b', x: 0, y: 9 * C, label: 'RED' },     // Bottom-Left
-    { color: '#2ec060', x: 0, y: 0, label: 'GREEN' },   // Top-Left
-    { color: '#e8c03b', x: 9 * C, y: 0, label: 'YELLOW' },  // Top-Right
-    { color: '#3b6ae8', x: 9 * C, y: 9 * C, label: 'BLUE' }     // Bottom-Right
+    { color: '#e83b3b', x: 0, y: 9 * C, label: 'RED' },
+    { color: '#2ec060', x: 0, y: 0, label: 'GREEN' },
+    { color: '#e8c03b', x: 9 * C, y: 0, label: 'YELLOW' },
+    { color: '#3b6ae8', x: 9 * C, y: 9 * C, label: 'BLUE' }
   ];
 
   bases.forEach(b => {
-    // Outer fill
     ctx.fillStyle = b.color + '22';
     ctx.fillRect(b.x, b.y, 6 * C, 6 * C);
 
-    // Border
     ctx.strokeStyle = b.color + '88';
     ctx.lineWidth = 2;
     ctx.strokeRect(b.x + 1, b.y + 1, 6 * C - 2, 6 * C - 2);
 
-    // Inner base circle area
     ctx.fillStyle = b.color + '33';
     const cx = b.x + 3 * C;
     const cy = b.y + 3 * C;
     ctx.beginPath();
     ctx.arc(cx, cy, 2.2 * C, 0, Math.PI * 2);
     ctx.fill();
+
     ctx.strokeStyle = b.color + '66';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Draw 4 empty token placeholders
     const offset = C * 1.25;
     const slotRadius = C * 0.38;
     for (let i = 0; i < 4; i++) {
@@ -596,17 +585,16 @@ function drawBoardBase() {
       ctx.arc(cx + bx, cy + by, slotRadius + 2, 0, Math.PI * 2);
       ctx.fillStyle = b.color + '44';
       ctx.fill();
-      ctx.strokeStyle = '#ffffff60'; // Soft white transparent ring
+
+      ctx.strokeStyle = '#ffffff60';
       ctx.lineWidth = 2;
       ctx.stroke();
     }
   });
 
-  // Track background
   for (let row = 0; row < 15; row++) {
     for (let col = 0; col < 15; col++) {
-      const isTrack = isTrackCell(col, row);
-      if (isTrack) {
+      if (isTrackCell(col, row)) {
         ctx.fillStyle = '#252540';
         ctx.fillRect(col * C, row * C, C, C);
         ctx.strokeStyle = '#2e2e52';
@@ -616,23 +604,34 @@ function drawBoardBase() {
     }
   }
 
-
-
-  // Home column coloring
   HOME_COLS.red.forEach(([c, r], i) => {
-    if (i < 5) { ctx.fillStyle = '#e83b3b55'; ctx.fillRect(c * C, r * C, C, C); }
-  });
-  HOME_COLS.blue.forEach(([c, r], i) => {
-    if (i < 5) { ctx.fillStyle = '#3b6ae855'; ctx.fillRect(c * C, r * C, C, C); }
-  });
-  HOME_COLS.green.forEach(([c, r], i) => {
-    if (i < 5) { ctx.fillStyle = '#2ec06055'; ctx.fillRect(c * C, r * C, C, C); }
-  });
-  HOME_COLS.yellow.forEach(([c, r], i) => {
-    if (i < 5) { ctx.fillStyle = '#e8c03b55'; ctx.fillRect(c * C, r * C, C, C); }
+    if (i < 5) {
+      ctx.fillStyle = '#e83b3b55';
+      ctx.fillRect(c * C, r * C, C, C);
+    }
   });
 
-  // Safe cell stars
+  HOME_COLS.blue.forEach(([c, r], i) => {
+    if (i < 5) {
+      ctx.fillStyle = '#3b6ae855';
+      ctx.fillRect(c * C, r * C, C, C);
+    }
+  });
+
+  HOME_COLS.green.forEach(([c, r], i) => {
+    if (i < 5) {
+      ctx.fillStyle = '#2ec06055';
+      ctx.fillRect(c * C, r * C, C, C);
+    }
+  });
+
+  HOME_COLS.yellow.forEach(([c, r], i) => {
+    if (i < 5) {
+      ctx.fillStyle = '#e8c03b55';
+      ctx.fillRect(c * C, r * C, C, C);
+    }
+  });
+
   TRACK_CELLS.forEach(([c, r], idx) => {
     if (SAFE_INDICES.has(idx)) {
       ctx.fillStyle = '#ffffff20';
@@ -641,20 +640,19 @@ function drawBoardBase() {
     }
   });
 
-  // Starting cells
   const startCells = [
-    { idx: 0, color: '#e83b3b' }, // red
-    { idx: 13, color: '#2ec060' }, // green
-    { idx: 26, color: '#e8c03b' }, // yellow
-    { idx: 39, color: '#3b6ae8' }  // blue
+    { idx: 0, color: '#e83b3b' },
+    { idx: 13, color: '#2ec060' },
+    { idx: 26, color: '#e8c03b' },
+    { idx: 39, color: '#3b6ae8' }
   ];
+
   startCells.forEach(sc => {
     const [c, r] = TRACK_CELLS[sc.idx];
     ctx.fillStyle = sc.color + '80';
     ctx.fillRect(c * C + 1, r * C + 1, C - 2, C - 2);
   });
 
-  // Center home triangle
   drawCenterHome();
 }
 
@@ -663,12 +661,11 @@ function drawCenterHome() {
   const cy = 7.5 * C;
   const s = 1.4 * C;
 
-  // Draw 4 triangles pointing to center
   const triangles = [
-    { color: '#e83b3b', points: [[cx - s, cy + s], [cx + s, cy + s], [cx, cy]] }, // Red (bottom pointing up)
-    { color: '#3b6ae8', points: [[cx + s, cy - s], [cx + s, cy + s], [cx, cy]] },  // Blue (right pointing left)
-    { color: '#e8c03b', points: [[cx - s, cy - s], [cx + s, cy - s], [cx, cy]] },  // Yellow (top pointing down)
-    { color: '#2ec060', points: [[cx - s, cy - s], [cx - s, cy + s], [cx, cy]] }   // Green (left pointing right)
+    { color: '#e83b3b', points: [[cx - s, cy + s], [cx + s, cy + s], [cx, cy]] },
+    { color: '#3b6ae8', points: [[cx + s, cy - s], [cx + s, cy + s], [cx, cy]] },
+    { color: '#e8c03b', points: [[cx - s, cy - s], [cx + s, cy - s], [cx, cy]] },
+    { color: '#2ec060', points: [[cx - s, cy - s], [cx - s, cy + s], [cx, cy]] }
   ];
 
   triangles.forEach(tri => {
@@ -680,27 +677,23 @@ function drawCenterHome() {
     ctx.fill();
   });
 
-  // Center star
   ctx.beginPath();
   ctx.arc(cx, cy, C * 0.3, 0, Math.PI * 2);
   ctx.fillStyle = '#0d0d1a';
   ctx.fill();
+
   ctx.strokeStyle = '#f0c040';
   ctx.lineWidth = 2;
   ctx.stroke();
-  drawStar(cx, cy, C * 0.22, '#f0c040');
-}
 
-function drawTrack() {
-  // Draw grid lines on track cells only
+  drawStar(cx, cy, C * 0.22, '#f0c040');
+}function drawTrack() {
   ctx.strokeStyle = '#2e2e52';
   ctx.lineWidth = 0.5;
 }
 
 function isTrackCell(col, row) {
-  // Columns 6-8 vertically (central vertical strip)
   if (col >= 6 && col <= 8 && row >= 0 && row <= 14) return true;
-  // Rows 6-8 horizontally (central horizontal strip)
   if (row >= 6 && row <= 8 && col >= 0 && col <= 14) return true;
   return false;
 }
@@ -708,105 +701,231 @@ function isTrackCell(col, row) {
 function drawStar(x, y, r, color) {
   ctx.fillStyle = color;
   ctx.beginPath();
+
   for (let i = 0; i < 5; i++) {
     const a = (i * 4 * Math.PI / 5) - Math.PI / 2;
     const ai = ((i * 4 + 2) * Math.PI / 5) - Math.PI / 2;
+
     if (i === 0) ctx.moveTo(x + r * Math.cos(a), y + r * Math.sin(a));
     else ctx.lineTo(x + r * Math.cos(a), y + r * Math.sin(a));
+
     ctx.lineTo(x + r * 0.4 * Math.cos(ai), y + r * 0.4 * Math.sin(ai));
   }
+
   ctx.closePath();
   ctx.fill();
 }
 
 function getTokenCanvasPos(color, position, tokenIndex) {
   if (position === -1) {
-    // Base
-    const offset = C * 1.25; // Good visual offset for token slots inside the base
+    const offset = C * 1.25;
     const bx = [-offset, offset, -offset, offset][tokenIndex];
     const by = [-offset, -offset, offset, offset][tokenIndex];
-    // Base center for red is (3, 12), green is (3, 3), yellow is (12, 3), blue is (12, 12)
-    const cx = color === 'red' ? 3 : color === 'green' ? 3 : color === 'yellow' ? 12 : 12;
+
+    const cx = color === 'red' ? 3 : color === 'green' ? 3 : 12;
     const cy = color === 'red' ? 12 : color === 'green' ? 3 : color === 'yellow' ? 3 : 12;
+
     return {
       x: cx * C + bx,
       y: cy * C + by
     };
   }
+
   if (position === 200) {
-    // Home
     const cx = 7.5 * C;
     const cy = 7.5 * C;
     const offsets = [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]];
+
     return {
       x: cx + offsets[tokenIndex][0] * C,
       y: cy + offsets[tokenIndex][1] * C
     };
   }
+
   if (position >= 100 && position < 200) {
-    // Home column
     const step = position - 100;
     const hcells = HOME_COLS[color];
+
     if (step < hcells.length) {
       const [c, r] = hcells[step];
       return { x: (c + 0.5) * C, y: (r + 0.5) * C };
     }
   }
-  // Main track
+
   if (position >= 0 && position < TRACK_CELLS.length) {
     const [c, r] = TRACK_CELLS[position];
     return { x: (c + 0.5) * C, y: (r + 0.5) * C };
   }
+
   return { x: 0, y: 0 };
-}
+}// =====================================================================
+// 3D CHESS PAWN TOKEN RENDERING
+// =====================================================================
 
 function drawTokens(gs) {
-  const tokenRadius = C * 0.38;
-
   COLORS.forEach(color => {
     gs.tokens[color].forEach((token, idx) => {
+      if (token.position === -99) return;
+
       const pos = getTokenCanvasPos(color, token.position, idx);
-
-      // Shadow
-      ctx.beginPath();
-      ctx.arc(pos.x + 3, pos.y + 3, tokenRadius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fill();
-
-      // Outer glow/stroke
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, tokenRadius + 2, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.fill();
-
-      // Token body with gradient
-      const grad = ctx.createRadialGradient(pos.x - 4, pos.y - 4, 1, pos.x, pos.y, tokenRadius);
-      grad.addColorStop(0, COLOR_LIGHT[color]);
-      grad.addColorStop(1, COLOR_MAP[color]);
-
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, tokenRadius, 0, Math.PI * 2);
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Inner decorative ring
-      ctx.beginPath();
-      ctx.arc(pos.x, pos.y, tokenRadius * 0.7, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // Coin number
-      ctx.fillStyle = '#ffffff';
-      ctx.font = `bold ${C * 0.3}px Rajdhani`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.shadowBlur = 4;
-      ctx.shadowColor = 'rgba(0,0,0,0.5)';
-      ctx.fillText(idx + 1, pos.x, pos.y);
-      ctx.shadowBlur = 0;
+      drawPawnToken(color, pos.x, pos.y, C * 0.38, idx + 1);
     });
   });
+}
+
+function drawPawnToken(color, x, y, size, number) {
+  const light = COLOR_LIGHT[color];
+  const main = COLOR_MAP[color];
+
+  // Ground shadow
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(
+    x + size * 0.12,
+    y + size * 0.35,
+    size * 0.72,
+    size * 0.28,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fillStyle = 'rgba(0,0,0,0.38)';
+  ctx.fill();
+  ctx.restore();
+
+  // Pawn base
+  const baseGrad = ctx.createRadialGradient(
+    x - size * 0.25,
+    y + size * 0.12,
+    size * 0.05,
+    x,
+    y + size * 0.12,
+    size * 0.8
+  );
+
+  baseGrad.addColorStop(0, '#ffffff');
+  baseGrad.addColorStop(0.18, light);
+  baseGrad.addColorStop(0.65, main);
+  baseGrad.addColorStop(1, '#202020');
+
+  ctx.beginPath();
+  ctx.ellipse(
+    x,
+    y + size * 0.12,
+    size * 0.72,
+    size * 0.32,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fillStyle = baseGrad;
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = Math.max(1, size * 0.08);
+  ctx.stroke();
+
+  // Pawn body
+  ctx.beginPath();
+  ctx.moveTo(x - size * 0.48, y + size * 0.05);
+  ctx.bezierCurveTo(
+    x - size * 0.42, y - size * 0.22,
+    x - size * 0.18, y - size * 0.35,
+    x - size * 0.22, y - size * 0.58
+  );
+  ctx.lineTo(x + size * 0.22, y - size * 0.58);
+  ctx.bezierCurveTo(
+    x + size * 0.18, y - size * 0.35,
+    x + size * 0.42, y - size * 0.22,
+    x + size * 0.48, y + size * 0.05
+  );
+  ctx.closePath();
+
+  const bodyGrad = ctx.createLinearGradient(
+    x - size * 0.5,
+    y,
+    x + size * 0.5,
+    y
+  );
+
+  bodyGrad.addColorStop(0, '#202020');
+  bodyGrad.addColorStop(0.2, main);
+  bodyGrad.addColorStop(0.45, light);
+  bodyGrad.addColorStop(0.7, main);
+  bodyGrad.addColorStop(1, '#202020');
+
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth = Math.max(1, size * 0.06);
+  ctx.stroke();
+
+  // Neck ring
+  ctx.beginPath();
+  ctx.ellipse(
+    x,
+    y - size * 0.52,
+    size * 0.25,
+    size * 0.11,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fillStyle = light;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.stroke();
+
+  // Pawn head
+  const headY = y - size * 0.78;
+
+  const headGrad = ctx.createRadialGradient(
+    x - size * 0.2,
+    headY - size * 0.18,
+    size * 0.03,
+    x,
+    headY,
+    size * 0.43
+  );
+
+  headGrad.addColorStop(0, '#ffffff');
+  headGrad.addColorStop(0.25, light);
+  headGrad.addColorStop(0.7, main);
+  headGrad.addColorStop(1, '#202020');
+
+  ctx.beginPath();
+  ctx.arc(x, headY, size * 0.36, 0, Math.PI * 2);
+  ctx.fillStyle = headGrad;
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = Math.max(1, size * 0.06);
+  ctx.stroke();
+
+  // Head highlight
+  ctx.beginPath();
+  ctx.ellipse(
+    x - size * 0.12,
+    headY - size * 0.13,
+    size * 0.11,
+    size * 0.06,
+    -0.5,
+    0,
+    Math.PI * 2
+  );
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fill();
+
+  // Token number
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.max(9, C * 0.22)}px Rajdhani`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = '#000000';
+  ctx.shadowBlur = 3;
+  ctx.fillText(number, x, y + size * 0.02);
+  ctx.shadowBlur = 0;
 }
 
 async function animateJumpPath(color, tokenIndex, path) {
@@ -822,28 +941,28 @@ function animateStep(color, tokenIndex, targetPos) {
     const endCoord = getTokenCanvasPos(color, targetPos, tokenIndex);
 
     let startTime = null;
-    const duration = 250; // ms per step
+    const duration = 250;
 
     function step(timestamp) {
       if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / duration, 1);
 
-      // Jump arc (sine wave)
+      const progress = Math.min((timestamp - startTime) / duration, 1);
       const jumpHeight = C * 0.8;
       const currentJump = Math.sin(progress * Math.PI) * jumpHeight;
 
-      // Linear interpolation for X, Y
       const currentX = startCoord.x + (endCoord.x - startCoord.x) * progress;
-      const currentY = startCoord.y + (endCoord.y - startCoord.y) * progress - currentJump;
+      const currentY =
+        startCoord.y + (endCoord.y - startCoord.y) * progress - currentJump;
 
-      // Temporary state for drawing
       const tempTokens = JSON.parse(JSON.stringify(gameState.tokens));
-      tempTokens[color][tokenIndex].position = -99; // Hide original
+      tempTokens[color][tokenIndex].position = -99;
 
       drawBoard({ ...gameState, tokens: tempTokens });
 
-      // Draw flying token
-      drawSingleToken(color, tokenIndex, { x: currentX, y: currentY });
+      drawSingleToken(color, tokenIndex, {
+        x: currentX,
+        y: currentY
+      });
 
       if (progress < 1) {
         requestAnimationFrame(step);
@@ -853,41 +972,14 @@ function animateStep(color, tokenIndex, targetPos) {
         resolve();
       }
     }
+
     requestAnimationFrame(step);
   });
 }
 
 function drawSingleToken(color, tokenIndex, pos) {
-  const tokenRadius = C * 0.42; // Slightly larger when jumping
-
-  // Shadow
-  ctx.beginPath();
-  ctx.arc(pos.x + 6, pos.y + 10, tokenRadius, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.arc(pos.x, pos.y, tokenRadius + 2, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-
-  const grad = ctx.createRadialGradient(pos.x - 4, pos.y - 4, 1, pos.x, pos.y, tokenRadius);
-  grad.addColorStop(0, COLOR_LIGHT[color]);
-  grad.addColorStop(1, COLOR_MAP[color]);
-
-  ctx.beginPath();
-  ctx.arc(pos.x, pos.y, tokenRadius, 0, Math.PI * 2);
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${C * 0.3}px Rajdhani`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(tokenIndex + 1, pos.x, pos.y);
-}
-
-function showScreen(name) {
+  drawPawnToken(color, pos.x, pos.y, C * 0.42, tokenIndex + 1);
+}function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const target = document.getElementById(`screen-${name}`);
   if (target) target.classList.add('active');
@@ -898,9 +990,9 @@ function highlightValidMoves(gs) {
 
   gs.tokens[myColor].forEach((token, idx) => {
     if (!validTokenIndices.has(idx)) return;
+
     const pos = getTokenCanvasPos(myColor, token.position, idx);
 
-    // Glowing ring
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, C * 0.46, 0, Math.PI * 2);
     ctx.strokeStyle = '#f0c040';
@@ -918,9 +1010,11 @@ function highlightValidMoves(gs) {
 function animateDice(value) {
   const dice = document.getElementById('dice');
   dice.classList.remove('rolling');
-  void dice.offsetWidth; // reflow
+  void dice.offsetWidth;
   dice.classList.add('rolling');
+
   const faces = ['', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣'];
+
   setTimeout(() => {
     dice.classList.remove('rolling');
     dice.textContent = faces[value] || value;
@@ -933,8 +1027,12 @@ function animateDice(value) {
 function addChatMessage(name, color, message) {
   const el = document.getElementById('chat-messages');
   const div = document.createElement('div');
+
   div.className = 'chat-msg';
-  div.innerHTML = `<span class="msg-name" style="color:${COLOR_LIGHT[color] || '#ccc'}">${escHtml(name)}:</span>${escHtml(message)}`;
+  div.innerHTML =
+    `<span class="msg-name" style="color:${COLOR_LIGHT[color] || '#ccc'}">` +
+    `${escHtml(name)}:</span>${escHtml(message)}`;
+
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
 }
@@ -942,12 +1040,17 @@ function addChatMessage(name, color, message) {
 function addLogEntry(text) {
   const el = document.getElementById('log-messages');
   if (!el) return;
+
   const div = document.createElement('div');
   div.className = 'log-entry';
   div.innerHTML = text;
+
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
-  if (el.children.length > 50) el.removeChild(el.firstChild);
+
+  if (el.children.length > 50) {
+    el.removeChild(el.firstChild);
+  }
 }
 
 // =====================================================================
@@ -955,22 +1058,29 @@ function addLogEntry(text) {
 // =====================================================================
 function showWinnerScreen(rankings) {
   showScreen('winner');
+
   const first = rankings[0];
+
   document.getElementById('winner-title').textContent = 'WINNER!';
   document.getElementById('winner-name').textContent = `🎉 ${first.name}`;
-  document.getElementById('winner-name').style.color = COLOR_LIGHT[first.color] || '#fff';
+  document.getElementById('winner-name').style.color =
+    COLOR_LIGHT[first.color] || '#fff';
 
   const list = document.getElementById('rankings-list');
   list.innerHTML = '';
+
   const medals = ['gold', 'silver', 'bronze', ''];
+
   rankings.forEach((r, i) => {
     const div = document.createElement('div');
     div.className = 'ranking-row';
+
     div.innerHTML = `
       <div class="rank-num ${medals[i]}">#${r.rank}</div>
       <div class="rank-color" style="background:${COLOR_MAP[r.color] || '#ccc'}"></div>
       <div class="rank-name">${escHtml(r.name)}</div>
     `;
+
     list.appendChild(div);
   });
 }
@@ -984,6 +1094,7 @@ function showFloatingEmoji(emoji) {
   el.textContent = emoji;
   el.style.left = (20 + Math.random() * 60) + 'vw';
   el.style.bottom = '20vh';
+
   document.getElementById('emoji-reactions').appendChild(el);
   setTimeout(() => el.remove(), 3100);
 }
@@ -992,10 +1103,12 @@ function showFloatingEmoji(emoji) {
 // TOAST
 // =====================================================================
 let toastTimer = null;
+
 function showToast(msg, type = '') {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.className = `toast${type ? ' ' + type : ''} show`;
+
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
 }
