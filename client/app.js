@@ -68,6 +68,8 @@ let socket;
 let mySocketId = null;
 let myColor = null;
 let gameState = null;
+// Keep server state updates queued behind token movement animations.
+let moveAnimationPromise = Promise.resolve();
 let roomId = null;
 let animatingToken = null;
 let selectedPower = null;
@@ -363,7 +365,16 @@ function setupSocketEvents() {
     addLogEntry('Game started!');
   });
 
-  socket.on('game_state', (gs) => {
+  socket.on('game_state', async (gs) => {
+    // The server emits token_moved and then game_state immediately.
+    // Wait until the pawn has visibly stepped through every cell before
+    // applying the final authoritative state, otherwise it jumps instantly.
+    try {
+      await moveAnimationPromise;
+    } catch (error) {
+      console.error('Move animation failed:', error);
+    }
+
     gameState = gs;
     renderGameUI();
     drawBoard(gs);
@@ -412,7 +423,7 @@ function setupSocketEvents() {
     }
   });
 
-  socket.on('token_moved', async ({
+  socket.on('token_moved', ({
     color,
     tokenIndex,
     oldPosition,
@@ -421,28 +432,33 @@ function setupSocketEvents() {
     captured,
     dice
   }) => {
-    if (path && path.length > 0) {
-      await animateJumpPath(color, tokenIndex, path);
-    } else {
-      gameState.tokens[color][tokenIndex].position = newPosition;
-    }
+    // Assign synchronously so the following game_state event can await it.
+    moveAnimationPromise = (async () => {
+      if (path && path.length > 0) {
+        await animateJumpPath(color, tokenIndex, path);
+      } else if (gameState?.tokens?.[color]?.[tokenIndex]) {
+        gameState.tokens[color][tokenIndex].position = newPosition;
+      }
 
-    captured?.forEach(({ color: c, tokenIndex: ti }) => {
-      gameState.tokens[c][ti].position = -1;
-    });
-
-    drawBoard(gameState);
-
-    if (captured?.length > 0) {
-      captured.forEach(({ color: c }) => {
-        addLogEntry(`💥 ${capColor(color)} captured ${capColor(c)}!`);
-        showToast(`${capColor(color)} captured ${capColor(c)}!`);
+      captured?.forEach(({ color: c, tokenIndex: ti }) => {
+        if (gameState?.tokens?.[c]?.[ti]) {
+          gameState.tokens[c][ti].position = -1;
+        }
       });
-    }
 
-    if (newPosition === 200) {
-      addLogEntry(`🏠 ${capColor(color)} coin reached home!`);
-    }
+      drawBoard(gameState);
+
+      if (captured?.length > 0) {
+        captured.forEach(({ color: c }) => {
+          addLogEntry(`💥 ${capColor(color)} captured ${capColor(c)}!`);
+          showToast(`${capColor(color)} captured ${capColor(c)}!`);
+        });
+      }
+
+      if (newPosition === 200) {
+        addLogEntry(`🏠 ${capColor(color)} coin reached home!`);
+      }
+    })();
   });
 
   socket.on('player_finished', ({ color, name, rank }) => {
