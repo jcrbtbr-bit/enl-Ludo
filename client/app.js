@@ -1110,7 +1110,7 @@ function showScreen(screenName) {
     screen.classList.remove("active");
   });
 
-  const target = document.getElementById(screenName);
+  const target = document.getElementById(`screen-${screenName}`);
   if (target) target.classList.add("active");
 }
 
