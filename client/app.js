@@ -70,6 +70,7 @@ let myColor = null;
 let gameState = null;
 let roomId = null;
 let animatingToken = null;
+let selectedPower = null;
 
 let canvas, ctx;
 
@@ -83,6 +84,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   socket = io("https://ludo-9dtp.onrender.com");
 
+  createPowerUI();
   setupSocketEvents();
   setupUIEvents();
   drawBoard(null);
@@ -91,6 +93,30 @@ window.addEventListener('DOMContentLoaded', () => {
 // =====================================================================
 // UI EVENT SETUP
 // =====================================================================
+
+function createPowerUI() {
+  const boardArea = document.querySelector('.board-area');
+  if (!boardArea || document.getElementById('power-panel')) return;
+
+  const panel = document.createElement('div');
+  panel.id = 'power-panel';
+  panel.className = 'power-panel';
+  panel.innerHTML = `
+    <div class="power-title">⚡ POWER ABILITIES</div>
+    <div class="power-buttons">
+      <button type="button" class="power-btn" data-power="dice"><span class="power-icon">🎲</span><span>Dice</span></button>
+      <button type="button" class="power-btn" data-power="speed"><span class="power-icon">🚀</span><span>Speed +3</span></button>
+      <button type="button" class="power-btn" data-power="shield"><span class="power-icon">🛡️</span><span>Shield</span></button>
+      <button type="button" class="power-btn" data-power="double"><span class="power-icon">⚡</span><span>Double</span></button>
+      <button type="button" class="power-btn" data-power="attack"><span class="power-icon">💥</span><span>Attack</span></button>
+    </div>
+    <div id="power-hint" class="power-hint">Power бүрийг нэг тоглолтод нэг удаа ашиглана.</div>
+  `;
+
+  const diceArea = boardArea.querySelector('.dice-area');
+  if (diceArea) diceArea.insertAdjacentElement('afterend', panel);
+  else boardArea.appendChild(panel);
+}
 
 function setupUIEvents() {
   document.getElementById('btn-next').addEventListener('click', () => {
@@ -211,6 +237,40 @@ function setupUIEvents() {
     socket.emit('roll_dice');
   });
 
+  // POWER BUTTONS
+  document.getElementById('power-panel')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-power]');
+    if (!btn || btn.disabled) return;
+
+    const power = btn.dataset.power;
+    if (!gameState || gameState.currentTurn !== myColor) {
+      showToast('Таны ээлж биш байна.', 'error');
+      return;
+    }
+
+    if (power === 'shield' || power === 'attack') {
+      selectedPower = selectedPower === power ? null : power;
+      updatePowerHint();
+      renderPowerButtons();
+      if (selectedPower) {
+        showToast(power === 'shield'
+          ? 'Хамгаалах өөрийн хүүг сонгоно уу.'
+          : 'Довтлох өрсөлдөгчийн хүүг сонгоно уу.');
+      }
+      return;
+    }
+
+    socket.emit('use_power', { power });
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && selectedPower) {
+      selectedPower = null;
+      updatePowerHint();
+      renderPowerButtons();
+    }
+  });
+
   canvas.addEventListener('click', onBoardClick);
 
   // Chat
@@ -324,6 +384,34 @@ function setupSocketEvents() {
     );
   });
 
+  socket.on('power_used', data => {
+    const {
+      color, power, tokenIndex, targetColor, targetTokenIndex
+    } = data || {};
+
+    selectedPower = null;
+    updatePowerHint();
+    renderPowerButtons();
+
+    const names = {
+      dice: '🎲 Dice Power',
+      speed: '🚀 Speed Power',
+      shield: '🛡️ Shield Power',
+      double: '⚡ Double Power',
+      attack: '💥 Attack Power'
+    };
+
+    addLogEntry(`${capColor(color)} used ${names[power] || power}`);
+    showToast(`${names[power] || power} амжилттай ашиглалаа!`, 'success');
+
+    if (power === 'shield') {
+      addLogEntry(`🛡️ ${capColor(color)}-ийн ${Number(tokenIndex) + 1}-р хүү хамгаалалттай боллоо.`);
+    }
+    if (power === 'attack') {
+      addLogEntry(`💥 ${capColor(targetColor)}-ийн ${Number(targetTokenIndex) + 1}-р хүү суурь руу буцлаа.`);
+    }
+  });
+
   socket.on('token_moved', async ({
     color,
     tokenIndex,
@@ -384,6 +472,7 @@ function setupSocketEvents() {
   });
 
   socket.on('game_restarted', ({ room }) => {
+    selectedPower = null;
     gameState = null;
     myColor = null;
     showScreen('lobby');
@@ -560,6 +649,56 @@ function renderGameUI() {
   } else {
     diceEl.textContent = '🎲';
   }
+
+  renderPowerButtons();
+}
+
+function renderPowerButtons() {
+  const panel = document.getElementById('power-panel');
+  if (!panel || !gameState || !myColor) return;
+
+  const isMyTurn = gameState.currentTurn === myColor;
+  const used = gameState.powersUsed?.[myColor] || {};
+
+  panel.querySelectorAll('[data-power]').forEach(btn => {
+    const power = btn.dataset.power;
+    const isUsed = !!used[power];
+    let canUse = isMyTurn && !isUsed;
+
+    if (['dice', 'speed', 'double'].includes(power)) {
+      canUse = canUse && !!gameState.diceRolled &&
+        Array.isArray(gameState.validMoves) && gameState.validMoves.length > 0;
+    }
+
+    btn.disabled = !canUse;
+    btn.classList.toggle('used', isUsed);
+    btn.classList.toggle('selected', selectedPower === power);
+
+    const label = btn.querySelector('span:not(.power-icon)');
+    if (label) {
+      const labels = {
+        dice: 'Dice', speed: 'Speed +3', shield: 'Shield',
+        double: 'Double', attack: 'Attack'
+      };
+      label.textContent = isUsed ? `${labels[power]} ✓` : labels[power];
+    }
+  });
+
+  updatePowerHint();
+}
+
+function updatePowerHint() {
+  const hint = document.getElementById('power-hint');
+  if (!hint) return;
+
+  const messages = {
+    shield: '🛡️ Хамгаалах өөрийн хүүг самбар дээр дарна уу. (Esc — болих)',
+    attack: '💥 Довтлох өрсөлдөгчийн хүүг самбар дээр дарна уу. (Esc — болих)'
+  };
+
+  hint.textContent = selectedPower
+    ? messages[selectedPower]
+    : 'Power бүрийг нэг тоглолтод нэг удаа ашиглана.';
 }
 
 function updateRollButton() {
@@ -605,22 +744,68 @@ function startTimerBar() {
 // =====================================================================
 
 function onBoardClick(e) {
-  if (!gameState || !gameState.diceRolled || gameState.currentTurn !== myColor) return;
-  if (!gameState.validMoves || gameState.validMoves.length === 0) return;
+  if (!gameState || gameState.currentTurn !== myColor) return;
 
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
-
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
 
-  const tokens = gameState.tokens[myColor];
+  // SHIELD: choose one of your own tokens on the main track.
+  if (selectedPower === 'shield') {
+    const ownTokens = gameState.tokens?.[myColor] || [];
+    for (let i = 0; i < ownTokens.length; i++) {
+      const token = ownTokens[i];
+      if (token.position < 0 || token.position > 51) continue;
 
+      const pos = getTokenCanvasPos(myColor, token.position, i);
+      const dx = mx - pos.x;
+      const dy = my - pos.y;
+      if (Math.sqrt(dx * dx + dy * dy) < C * 0.8) {
+        socket.emit('use_power', { power: 'shield', tokenIndex: i });
+        return;
+      }
+    }
+    showToast('Самбар дээр байгаа өөрийн хүүг сонгоно уу.', 'error');
+    return;
+  }
+
+  // ATTACK: choose an opponent token on the main track.
+  if (selectedPower === 'attack') {
+    for (const color of COLORS) {
+      if (color === myColor) continue;
+      const enemyTokens = gameState.tokens?.[color] || [];
+
+      for (let i = 0; i < enemyTokens.length; i++) {
+        const token = enemyTokens[i];
+        if (token.position < 0 || token.position > 51) continue;
+
+        const pos = getTokenCanvasPos(color, token.position, i);
+        const dx = mx - pos.x;
+        const dy = my - pos.y;
+        if (Math.sqrt(dx * dx + dy * dy) < C * 0.8) {
+          socket.emit('use_power', {
+            power: 'attack',
+            targetColor: color,
+            targetTokenIndex: i
+          });
+          return;
+        }
+      }
+    }
+    showToast('Довтлох боломжтой өрсөлдөгчийн хүүг сонгоно уу.', 'error');
+    return;
+  }
+
+  // NORMAL TOKEN MOVE
+  if (!gameState.diceRolled) return;
+  if (!gameState.validMoves || gameState.validMoves.length === 0) return;
+
+  const tokens = gameState.tokens[myColor];
   for (const move of gameState.validMoves) {
     const token = tokens[move.tokenIndex];
     const pos = getTokenCanvasPos(myColor, token.position, move.tokenIndex);
-
     const dx = mx - pos.x;
     const dy = my - pos.y;
 
@@ -950,7 +1135,21 @@ function drawTokens(gs) {
       if (token.position === -99) return;
 
       const pos = getTokenCanvasPos(color, token.position, idx);
-      drawPawnToken(color, pos.x, pos.y, C * 0.38, idx + 1);
+      const size = C * 0.38;
+      drawPawnToken(color, pos.x, pos.y, size, idx + 1);
+
+      const shielded = gs.shieldedTokens?.[color] || [];
+      if (Array.isArray(shielded) && shielded.includes(idx)) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y - size * 0.25, size * 1.05, 0, Math.PI * 2);
+        ctx.strokeStyle = '#65d9ff';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#65d9ff';
+        ctx.shadowBlur = 12;
+        ctx.stroke();
+        ctx.restore();
+      }
     });
   });
 }
